@@ -1,0 +1,53 @@
+#!/bin/bash
+# Link this checkout in as an Omarchy theme and play its video wallpaper.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+SLUG="systemd-nostalgia"
+THEME_PATH="${HOME}/.config/omarchy/themes/${SLUG}"
+HOOK_NAME="systemd-nostalgia-wallpaper"
+
+if ! command -v mpvpaper >/dev/null 2>&1; then
+  echo "mpvpaper is required. Install it, then re-run ./install:" >&2
+  echo "  omarchy pkg add mpvpaper" >&2
+  exit 1
+fi
+
+if [[ ! -f "$ROOT/video/wallpaper.mp4" ]]; then
+  echo "Missing video: $ROOT/video/wallpaper.mp4" >&2
+  exit 1
+fi
+
+mkdir -p "${HOME}/.config/omarchy/themes"
+
+if [[ -e "$THEME_PATH" || -L "$THEME_PATH" ]]; then
+  existing="$(readlink -f "$THEME_PATH" || true)"
+  if [[ "$existing" != "$ROOT" ]]; then
+    rm -rf "$THEME_PATH"
+    ln -s "$ROOT" "$THEME_PATH"
+  fi
+else
+  ln -s "$ROOT" "$THEME_PATH"
+fi
+
+install_hook() {
+  local kind="$1"
+  local dir="${HOME}/.config/omarchy/hooks/${kind}.d"
+  local path="${dir}/${HOOK_NAME}"
+  mkdir -p "$dir"
+  cat >"$path" <<EOF
+#!/bin/bash
+exec "$THEME_PATH/wallpaper.sh" "\$@"
+EOF
+  chmod 755 "$path"
+}
+
+install_hook theme-set
+install_hook post-boot
+
+# Older local hook hardcoded a monitor and a Downloads path. It fights this one.
+rm -f "${HOME}/.config/omarchy/hooks/theme-set.d/systemd-wallpaper"
+
+omarchy theme set "$SLUG"
+echo "Systemd Nostalgia is installed. Switching themes stops the video; switching back starts it."
